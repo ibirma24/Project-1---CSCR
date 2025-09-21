@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path  
 
 # Set up individual paths for each image
-dark_image_path = Path("/Users/mateenibirogba/Documents/Computer Science/Project-1---CSCR/IMG_7845.dng")
-light_image_path = Path("/Users/mateenibirogba/Documents/Computer Science/Project-1---CSCR/IMG_7846.dng")
+# Use relative paths for portability
+dark_image_path = Path("IMG_7845.dng")
+light_image_path = Path("IMG_7846.dng")
 
 # Create lists for dark and light frames
 dark_frame_files = [dark_image_path]  # Dark frame (lens covered)
@@ -85,21 +86,12 @@ def analyze_noise(dng_files, patch_size=100, title="Noise Analysis"):
         plt.show()
 
     return results 
-
 # Image paths for dark and light frames
-dark_frame_files = [
-    Path("/Users/mateenibirogba/Documents/Computer Science/Project-1---CSCR/IMG_7845.dng")  # Dark frame (lens covered)
-]
+# (Removed duplicate definitions of dark_frame_files and light_frame_files)
 
-light_frame_files = [
-    Path("/Users/mateenibirogba/Documents/Computer Science/Project-1---CSCR/IMG_7846.dng")  # Light frame (white screen)
-]
 
 def results_plot(dark_results, light_results):
     """
-    Plot comparison between dark and bright frame analysis results.
-    Args:
-        dark_results: Results from dark frame analysis
         light_results: Results from bright frame analysis
     """
     # Create a figure with subplots

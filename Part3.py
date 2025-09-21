@@ -2,21 +2,21 @@ import cv2
 import numpy as np
 import datetime
 
-def convolution(image, kernel):
+def apply_convolution(image, filter):
     """
-    Apply convolution to an image using a specified kernel.
+    Apply convolution to an image using a specified filter.
     
     Args:
         image: Input image as a NumPy array.
-        kernel: Convolution kernel as a NumPy array.
+        filter: Convolution filter as a NumPy array (must be square and odd-sized).
         
     Returns:
         Convolved image as a NumPy array.
     """
-    # Get image and kernel dimensions
+    # Get image and filter dimensions
     img_height, img_width = image.shape
-    kernel_size = kernel.shape[0]
-    pad_size = kernel_size // 2
+    filter_size = filter.shape[0]
+    pad_size = filter_size // 2
 
     # Create output image with same dimensions as input
     output = np.zeros_like(image, dtype=np.float32)
@@ -28,9 +28,9 @@ def convolution(image, kernel):
     for y in range(img_height):
         for x in range(img_width):
             # Extract the region of interest
-            region = padded_image[y:y + kernel_size, x:x + kernel_size]
-            # Apply the kernel to the regionn 
-            output[y, x] = np.sum(region * kernel)
+            region = padded_image[y:y + filter_size, x:x + filter_size]
+            # Apply the filter to the region
+            output[y, x] = np.sum(region * filter)
 
     return output
 
@@ -59,7 +59,7 @@ def process_frame(frame, current_filter):
     if kernel is None:
         filtered_frame = gray_frame
     else:
-        filtered_frame = convolution(gray_frame, kernel)
+        filtered_frame = apply_convolution(gray_frame, kernel)
         filtered_frame = np.clip(filtered_frame, 0, 255).astype(np.uint8)
     
     # Add filter name and instructions
@@ -123,11 +123,9 @@ def main():
             # Process frame
             filter_name, filtered_frame, og_display = process_frame(frame, current_filter)
 
-            # Combine images horizontally
-            combined_display = np.hstack((og_display, cv2.cvtColor(filtered_frame, cv2.COLOR_GRAY2BGR)))
-
-            # Show result
-            cv2.imshow("Webcam Filter", combined_display)
+            # Show original and filtered images in separate windows
+            cv2.imshow("Original Webcam Feed", og_display)
+            cv2.imshow("Filtered Output", filtered_frame)
 
             # Handle key presses
             key = cv2.waitKey(1) & 0xFF
