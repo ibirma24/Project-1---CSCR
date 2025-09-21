@@ -1,4 +1,194 @@
-import rawpy  
+import rawpy
+import numpy as np
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+def analyze_raw_image(file_path, region_size=100):
+    """
+    Analyze a raw DNG image for noise characteristics.
+    
+    Args:
+        file_path: Path to the DNG file
+        region_size: Size of the square region to analyze (default 100x100 pixels)
+    
+    Returns:
+        Dictionary containing analysis results
+    """
+    with rawpy.imread(file_path) as raw:
+        # Get raw data
+        raw_data = raw.raw_image_visible
+        
+        # Get image center for analysis region
+        h, w = raw_data.shape
+        center_y = h // 2
+        center_x = w // 2
+        
+        # Extract center region
+        region = raw_data[center_y - region_size//2:center_y + region_size//2,
+                         center_x - region_size//2:center_x + region_size//2]
+        
+        # Calculate statistics
+        mean_val = np.mean(region)
+        std_val = np.std(region)
+        min_val = np.min(region)
+        max_val = np.max(region)
+        
+        # Create histogram data
+        hist, bins = np.histogram(region.flatten(), bins=50)
+        
+        return {
+            'filename': Path(file_path).name,
+            'shape': raw_data.shape,
+            'data_type': str(raw_data.dtype),
+            'mean': mean_val,
+            'std': std_val,
+            'min': min_val,
+            'max': max_val,
+            'histogram': (hist, bins),
+            'region_data': region
+        }
+
+def plot_analysis_results(dark_frames_results, bright_frames_results):
+    """
+    Plot comparative analysis of dark and bright frames.
+    """
+    plt.style.use('seaborn')
+    fig = plt.figure(figsize=(15, 10))
+    
+    # Create subplots grid
+    gs = plt.GridSpec(2, 2)
+    
+    # Plot histograms for dark frames
+    ax1 = fig.add_subplot(gs[0, 0])
+    for result in dark_frames_results:
+        hist, bins = result['histogram']
+        plt.stairs(hist, bins, alpha=0.5, label=f"{result['filename']}")
+    plt.title('Dark Frames Intensity Distribution')
+    plt.xlabel('Pixel Value')
+    plt.ylabel('Frequency')
+    plt.legend(fontsize='small')
+    
+    # Plot histograms for bright frames
+    ax2 = fig.add_subplot(gs[0, 1])
+    for result in bright_frames_results:
+        hist, bins = result['histogram']
+        plt.stairs(hist, bins, alpha=0.5, label=f"{result['filename']}")
+    plt.title('Bright Frames Intensity Distribution')
+    plt.xlabel('Pixel Value')
+    plt.ylabel('Frequency')
+    plt.legend(fontsize='small')
+    
+    # Create statistics table
+    ax3 = fig.add_subplot(gs[1, :])
+    ax3.axis('tight')
+    ax3.axis('off')
+    
+    # Prepare table data
+    table_data = []
+    headers = ['Frame Type', 'Filename', 'Mean (μ)', 'Std Dev (σ)', 'Min', 'Max']
+    
+    for result in dark_frames_results:
+        table_data.append([
+            'Dark',
+            result['filename'],
+            f"{result['mean']:.2f}",
+            f"{result['std']:.2f}",
+            f"{result['min']:.2f}",
+            f"{result['max']:.2f}"
+        ])
+    
+    for result in bright_frames_results:
+        table_data.append([
+            'Bright',
+            result['filename'],
+            f"{result['mean']:.2f}",
+            f"{result['std']:.2f}",
+            f"{result['min']:.2f}",
+            f"{result['max']:.2f}"
+        ])
+    
+    table = ax3.table(cellText=table_data, colLabels=headers, 
+                     loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.2, 1.5)
+    
+    plt.suptitle('Noise Analysis: Dark Frames vs Bright Frames', fontsize=14)
+    plt.tight_layout()
+    plt.show()
+
+def print_analysis_summary(dark_frames_results, bright_frames_results):
+    """
+    Print a summary of the noise analysis results.
+    """
+    print("\nNoise Analysis Summary")
+    print("=====================")
+    
+    # Calculate averages for each frame type
+    dark_means = [r['mean'] for r in dark_frames_results]
+    dark_stds = [r['std'] for r in dark_frames_results]
+    bright_means = [r['mean'] for r in bright_frames_results]
+    bright_stds = [r['std'] for r in bright_frames_results]
+    
+    print("\nDark Frames (Dark Current Noise):")
+    print(f"Average Mean (μ): {np.mean(dark_means):.2f}")
+    print(f"Average Std Dev (σ): {np.mean(dark_stds):.2f}")
+    print(f"Coefficient of Variation: {np.mean(dark_stds)/np.mean(dark_means)*100:.2f}%")
+    
+    print("\nBright Frames (Shot Noise + Dark Current):")
+    print(f"Average Mean (μ): {np.mean(bright_means):.2f}")
+    print(f"Average Std Dev (σ): {np.mean(bright_stds):.2f}")
+    print(f"Coefficient of Variation: {np.mean(bright_stds)/np.mean(bright_means)*100:.2f}%")
+    
+    print("\nComparative Analysis:")
+    print("- Shot Noise Contribution:")
+    shot_noise = np.mean(bright_stds) - np.mean(dark_stds)
+    print(f"  Additional std dev in bright frames: {shot_noise:.2f}")
+    
+    snr_dark = np.mean(dark_means) / np.mean(dark_stds)
+    snr_bright = np.mean(bright_means) / np.mean(bright_stds)
+    print(f"- Signal-to-Noise Ratio (SNR):")
+    print(f"  Dark frames: {snr_dark:.2f}")
+    print(f"  Bright frames: {snr_bright:.2f}")
+
+def main():
+    # Analyze dark frames (taken with covered lens)
+    dark_frames = [
+        'IMG_7845.dng',  # Your dark frame
+    ]
+    
+    # Analyze bright frames (taken with white screen)
+    bright_frames = [
+        'IMG_7846.dng',  # Your bright frame
+    ]
+    
+    # Process dark frames
+    dark_frames_results = []
+    for frame in dark_frames:
+        try:
+            result = analyze_raw_image(frame)
+            dark_frames_results.append(result)
+        except Exception as e:
+            print(f"Error processing {frame}: {e}")
+    
+    # Process bright frames
+    bright_frames_results = []
+    for frame in bright_frames:
+        try:
+            result = analyze_raw_image(frame)
+            bright_frames_results.append(result)
+        except Exception as e:
+            print(f"Error processing {frame}: {e}")
+    
+    # Plot and print results
+    if dark_frames_results and bright_frames_results:
+        plot_analysis_results(dark_frames_results, bright_frames_results)
+        print_analysis_summary(dark_frames_results, bright_frames_results)
+    else:
+        print("No results to display. Please check your input files.")
+
+if __name__ == '__main__':
+    main()
 import numpy as np  
 import matplotlib.pyplot as plt  
 from pathlib import Path  
