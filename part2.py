@@ -71,23 +71,6 @@ def analyze_camera_comp(main_camera_file, telephoto_file, main_focal_length, tel
     Compare main and telephoto camera specifications and analyze images.
     Calculates Field of View (FOV) and performs noise analysis on uniform regions.
     
-    The analysis includes:
-    1. FOV calculation using FOV = 2 * arctan(w/(2f)) where:
-       - w is the sensor width in mm
-       - f is the focal length in mm
-    2. Noise analysis in uniform regions measuring:
-       - Mean (μ) for light intensity
-       - Standard deviation (σ) for noise level
-       - Signal-to-Noise Ratio (SNR) = μ/σ
-    
-    Args:
-        main_camera_file: Path to main camera DNG file
-        telephoto_file: Path to telephoto camera DNG file
-        main_focal_length: Main camera focal length in mm
-        tele_focal_length: Telephoto camera focal length in mm
-        main_sensor_width: Main camera sensor width in mm
-        tele_sensor_width: Telephoto camera sensor width in mm
-        analysis_region: Optional region for noise analysis (x, y, width, height)
     """
     # Calculate FOV for both cameras
     main_fov = calculate_fov(main_focal_length, main_sensor_width)
