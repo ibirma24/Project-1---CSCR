@@ -62,16 +62,16 @@ def process_frame(frame, current_filter):
         filtered_frame = apply_convolution(gray_frame, kernel)
         filtered_frame = np.clip(filtered_frame, 0, 255).astype(np.uint8)
     
-    # Add filter name and instructions
-    cv2.putText(filtered_frame, f"Filter: {filter_name}", (10, 30),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    cv2.putText(filtered_frame, "Space: Next filter | Q: Quit", (10, 60),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-    
     # Create original display with text
     og_display = frame.copy()
-    cv2.putText(og_display, "Original", (10, 30),
+    cv2.putText(og_display, "Original Feed", (10, 30),
                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(og_display, "Space: Next filter | Q: Quit", (10, 60),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    
+    # Add text to filtered frame
+    cv2.putText(filtered_frame, f"Filter: {filter_name}", (10, 30),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     
     return filter_name, filtered_frame, og_display
 
@@ -97,7 +97,11 @@ def main():
             print("Error: No camera was found.")
             return
 
-        # Set camera resolution
+        # Set window positions for side-by-side display
+        cv2.namedWindow('Original Feed')
+        cv2.namedWindow('Filtered Output')
+        cv2.moveWindow('Original Feed', 50, 100)
+        cv2.moveWindow('Filtered Output', 700, 100)  # Position to the right
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
@@ -124,8 +128,8 @@ def main():
             filter_name, filtered_frame, og_display = process_frame(frame, current_filter)
 
             # Show original and filtered images in separate windows
-            cv2.imshow("Original Webcam Feed", og_display)
-            cv2.imshow("Filtered Output", filtered_frame)
+            cv2.imshow('Original Feed', og_display)
+            cv2.imshow('Filtered Output', filtered_frame)
 
             # Handle key presses
             key = cv2.waitKey(1) & 0xFF

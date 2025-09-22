@@ -15,13 +15,20 @@ def analyze_raw_image(file_path, region_size=100):
         Dictionary containing analysis results
     """
     with rawpy.imread(file_path) as raw:
-        # Get raw data
-        raw_data = raw.raw_image_visible
+        # Get raw data and convert to postprocessed form
+        raw_data = raw.postprocess()
+        
+        # Convert to grayscale if it's RGB
+        if len(raw_data.shape) == 3:
+            raw_data = np.mean(raw_data, axis=2)
         
         # Get image center for analysis region
         h, w = raw_data.shape
         center_y = h // 2
         center_x = w // 2
+        
+        # Ensure region size doesn't exceed image dimensions
+        region_size = min(region_size, h//2, w//2)
         
         # Extract center region
         region = raw_data[center_y - region_size//2:center_y + region_size//2,
@@ -34,7 +41,7 @@ def analyze_raw_image(file_path, region_size=100):
         max_val = np.max(region)
         
         # Create histogram data
-        hist, bins = np.histogram(region.flatten(), bins=50)
+        hist = np.histogram(region.flatten(), bins=50, range=(0, 255))
         
         return {
             'filename': Path(file_path).name,
@@ -44,7 +51,7 @@ def analyze_raw_image(file_path, region_size=100):
             'std': std_val,
             'min': min_val,
             'max': max_val,
-            'histogram': (hist, bins),
+            'histogram': hist,
             'region_data': region
         }
 
@@ -52,7 +59,13 @@ def plot_analysis_results(dark_frames_results, bright_frames_results):
     """
     Plot comparative analysis of dark and bright frames.
     """
-    plt.style.use('seaborn')
+    # Set up the figure with a white background
+    plt.rcParams['figure.facecolor'] = 'white'
+    plt.rcParams['axes.facecolor'] = 'white'
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.color'] = 'gray'
+    plt.rcParams['grid.alpha'] = 0.3
+    
     fig = plt.figure(figsize=(15, 10))
     
     # Create subplots grid
@@ -60,23 +73,30 @@ def plot_analysis_results(dark_frames_results, bright_frames_results):
     
     # Plot histograms for dark frames
     ax1 = fig.add_subplot(gs[0, 0])
-    for result in dark_frames_results:
-        hist, bins = result['histogram']
-        plt.stairs(hist, bins, alpha=0.5, label=f"{result['filename']}")
-    plt.title('Dark Frames Intensity Distribution')
-    plt.xlabel('Pixel Value')
-    plt.ylabel('Frequency')
-    plt.legend(fontsize='small')
+    colors = ['b', 'r', 'g']  # Different colors for each frame
+    for idx, result in enumerate(dark_frames_results):
+        hist_data = result['histogram']
+        ax1.plot(hist_data[1][:-1], hist_data[0], alpha=0.7, 
+                color=colors[idx % len(colors)],
+                label=f"{result['filename']}")
+    ax1.set_title('Dark Frames Intensity Distribution', fontsize=12, pad=10)
+    ax1.set_xlabel('Pixel Value')
+    ax1.set_ylabel('Frequency')
+    ax1.legend(fontsize='small', loc='upper right')
+    ax1.grid(True, alpha=0.3)
     
     # Plot histograms for bright frames
     ax2 = fig.add_subplot(gs[0, 1])
-    for result in bright_frames_results:
-        hist, bins = result['histogram']
-        plt.stairs(hist, bins, alpha=0.5, label=f"{result['filename']}")
-    plt.title('Bright Frames Intensity Distribution')
-    plt.xlabel('Pixel Value')
-    plt.ylabel('Frequency')
-    plt.legend(fontsize='small')
+    for idx, result in enumerate(bright_frames_results):
+        hist_data = result['histogram']
+        ax2.plot(hist_data[1][:-1], hist_data[0], alpha=0.7,
+                color=colors[idx % len(colors)],
+                label=f"{result['filename']}")
+    ax2.set_title('Bright Frames Intensity Distribution', fontsize=12, pad=10)
+    ax2.set_xlabel('Pixel Value')
+    ax2.set_ylabel('Frequency')
+    ax2.legend(fontsize='small', loc='upper right')
+    ax2.grid(True, alpha=0.3)
     
     # Create statistics table
     ax3 = fig.add_subplot(gs[1, :])
@@ -107,11 +127,18 @@ def plot_analysis_results(dark_frames_results, bright_frames_results):
             f"{result['max']:.2f}"
         ])
     
+    # Create and style the table
     table = ax3.table(cellText=table_data, colLabels=headers, 
-                     loc='center', cellLoc='center')
+                     loc='center', cellLoc='center',
+                     cellColours=[['lightgray' if i % 2 == 0 else 'white'] * 6 for i in range(len(table_data))],
+                     colColours=['lightblue'] * 6)
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1.2, 1.5)
+    
+    # Add borders to cells
+    for cell in table._cells:
+        table._cells[cell].set_edgecolor('gray')
     
     plt.suptitle('Noise Analysis: Dark Frames vs Bright Frames', fontsize=14)
     plt.tight_layout()
@@ -119,47 +146,83 @@ def plot_analysis_results(dark_frames_results, bright_frames_results):
 
 def print_analysis_summary(dark_frames_results, bright_frames_results):
     """
-    Print a summary of the noise analysis results.
+    Print a summary of the noise analysis results for multiple frames.
     """
-    print("\nNoise Analysis Summary")
-    print("=====================")
+    print("\nDetailed Noise Analysis Summary")
+    print("============================")
     
-    # Calculate averages for each frame type
+    # Dark Frames Analysis
+    print("\nDark Frames (Dark Current Noise):")
+    print("---------------------------------")
+    for i, result in enumerate(dark_frames_results, 1):
+        print(f"\nDark Frame {i} ({result['filename']}):")
+        print(f"Mean (μ): {result['mean']:.2f}")
+        print(f"Std Dev (σ): {result['std']:.2f}")
+        print(f"Min: {result['min']:.2f}")
+        print(f"Max: {result['max']:.2f}")
+        print(f"Dynamic Range: {result['max'] - result['min']:.2f}")
+    
+    # Bright Frames Analysis
+    print("\nBright Frames (Shot Noise + Dark Current):")
+    print("-----------------------------------------")
+    for i, result in enumerate(bright_frames_results, 1):
+        print(f"\nBright Frame {i} ({result['filename']}):")
+        print(f"Mean (μ): {result['mean']:.2f}")
+        print(f"Std Dev (σ): {result['std']:.2f}")
+        print(f"Min: {result['min']:.2f}")
+        print(f"Max: {result['max']:.2f}")
+        print(f"Dynamic Range: {result['max'] - result['min']:.2f}")
+    
+    # Calculate aggregate statistics
     dark_means = [r['mean'] for r in dark_frames_results]
     dark_stds = [r['std'] for r in dark_frames_results]
     bright_means = [r['mean'] for r in bright_frames_results]
     bright_stds = [r['std'] for r in bright_frames_results]
     
-    print("\nDark Frames (Dark Current Noise):")
-    print(f"Average Mean (μ): {np.mean(dark_means):.2f}")
-    print(f"Average Std Dev (σ): {np.mean(dark_stds):.2f}")
+    print("\nAggregate Statistics:")
+    print("-------------------")
+    print("\nDark Frames:")
+    print(f"Average Mean (μ): {np.mean(dark_means):.2f} ± {np.std(dark_means):.2f}")
+    print(f"Average Std Dev (σ): {np.mean(dark_stds):.2f} ± {np.std(dark_stds):.2f}")
     print(f"Coefficient of Variation: {np.mean(dark_stds)/np.mean(dark_means)*100:.2f}%")
     
-    print("\nBright Frames (Shot Noise + Dark Current):")
-    print(f"Average Mean (μ): {np.mean(bright_means):.2f}")
-    print(f"Average Std Dev (σ): {np.mean(bright_stds):.2f}")
+    print("\nBright Frames:")
+    print(f"Average Mean (μ): {np.mean(bright_means):.2f} ± {np.std(bright_means):.2f}")
+    print(f"Average Std Dev (σ): {np.mean(bright_stds):.2f} ± {np.std(bright_stds):.2f}")
     print(f"Coefficient of Variation: {np.mean(bright_stds)/np.mean(bright_means)*100:.2f}%")
     
     print("\nComparative Analysis:")
-    print("- Shot Noise Contribution:")
+    print("--------------------")
     shot_noise = np.mean(bright_stds) - np.mean(dark_stds)
-    print(f"  Additional std dev in bright frames: {shot_noise:.2f}")
+    print("Shot Noise Contribution:")
+    print(f"Additional std dev in bright frames: {shot_noise:.2f}")
     
     snr_dark = np.mean(dark_means) / np.mean(dark_stds)
     snr_bright = np.mean(bright_means) / np.mean(bright_stds)
-    print(f"- Signal-to-Noise Ratio (SNR):")
-    print(f"  Dark frames: {snr_dark:.2f}")
-    print(f"  Bright frames: {snr_bright:.2f}")
+    print("\nSignal-to-Noise Ratio (SNR):")
+    print(f"Dark frames: {snr_dark:.2f}")
+    print(f"Bright frames: {snr_bright:.2f}")
+    print(f"SNR Improvement: {snr_bright/snr_dark:.2f}x")
+    
+    print("\nConsistency Analysis:")
+    print("Dark frames variance between images: {:.2f}%".format(
+        np.std(dark_means)/np.mean(dark_means)*100))
+    print("Bright frames variance between images: {:.2f}%".format(
+        np.std(bright_means)/np.mean(bright_means)*100))
 
 def main():
     # Analyze dark frames (taken with covered lens)
     dark_frames = [
-        'IMG_7845.dng',  # Your dark frame
+        'IMG_7845.dng',  # Dark frame 1
+        'IMG_7907.dng',  # Dark frame 2
+        'IMG_7908.dng'   # Dark frame 3
     ]
     
     # Analyze bright frames (taken with white screen)
     bright_frames = [
-        'IMG_7846.dng',  # Your bright frame
+        'IMG_7846.dng',  # Bright frame 1
+        'IMG_7909.dng',  # Bright frame 2
+        'IMG_7910.dng'   # Bright frame 3
     ]
     
     # Process dark frames
