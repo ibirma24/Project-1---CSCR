@@ -40,11 +40,7 @@ kernels = [
     ('Box Filter', np.ones((3, 3)) / 9),
     ('Gaussian Filter', np.array([[1,2,1], [2,4,2], [1,2,1]]) / 16),
     ('Sobel X', np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])),
-    ('Sobel Y', np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])),
     ('Sharpen', np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])),
-    ('Emboss', np.array([[-2, -1, 0], [-1, 1, 1], [0, 1, 2]])),
-    ('Edge Detect', np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]])),
-    ('Outline', np.array([[1, 1, 1], [1, -8, 1], [1, 1, 1]]))
 ]
 
 def process_frame(frame, current_filter):
